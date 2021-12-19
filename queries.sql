@@ -1,4 +1,14 @@
 use sglegis_hmlg_database;
+use sgLegis;
+/*
+SET FOREIGN_KEY_CHECKS = 0;
+    truncate table ceps;
+    truncate table cities;
+SET FOREIGN_KEY_CHECKS = 1;
+*/
+select count(1) from tmpCities; -- total correto 6068
+select count(1) from tmpStates;
+select count(1) from tmpLeisArtigosAspecto; -- total correto 8409
 
 insert into document_status (status_description, createdAt, updatedAt) values
 ('EM VIGOR',now(), now()),
@@ -11,12 +21,6 @@ insert into document_scopes (document_scope_description, createdAt, updatedAt) v
 ('FEDERAL',now(), now()),
 ('ESTADUAL',now(), now()),
 ('MUNICIPAL',now(), now());
-
-SET FOREIGN_KEY_CHECKS = 0;
-    truncate table ceps;
-    truncate table cities;
-SET FOREIGN_KEY_CHECKS = 1;
-
 
 insert into states (state_id, state_name, uf, createdAt)
 select cod_uf, nome_uf, sigla_uf, now() from tmpStates;
@@ -77,7 +81,7 @@ from (
 		scp.document_scope_id,
 		DOCUMENTO AS document_type,
 		NUMERO as document_number,
-		date_add(date('1899-12-31'), interval tmp.`DATA` day ) as document_date,
+		date_add(date('1899-12-31'), interval (tmp.`DATA` -1) day ) as document_date,
 		1 as document_status_id, -- EM VIGOR
 		coalesce(tmp.ementa, 'sem ementa') as document_summary,
 		uf.state_id as document_state_id,
@@ -123,9 +127,37 @@ inner join (
              left join states uf on d.document_state_id = uf.state_id
              left join cities c on c.state_id = d.document_state_id and c.city_id = d.document_city_id
 ) docs on x.NUMERO = docs.document_number AND
-          date_add(date('1899-12-31'), interval x.`DATA` day ) = docs.document_date
+          date_add(date('1899-12-31'), interval (x.`DATA` -1) day ) = docs.document_date
 where x.ITEM is not null;
 
+
+
+insert into items_areas_aspects (area_id , area_aspect_id, document_item_id, createdAt, updatedAt)
+select DISTINCT
+	a.area_id, aa.area_aspect_id, di.document_item_id, now(), now()
+from tmpLeisArtigosAspecto tlaa
+inner join areas a on upper(tlaa.MA)  = 'X' and 'MEIO AMBIENTE' = a.area_name and tlaa.ASPECTO is not null
+inner join areas_aspects aa on a.area_id = aa.area_id and UPPER(TRIM(tlaa.ASPECTO)) = aa.area_aspect_name
+inner join (
+    select d.document_id,
+           d.document_summary,
+           d.document_number,
+           d.document_scope_id,
+           ds.document_scope_description,
+           date_format(d.document_date, '%Y-%m-%d') as document_date,
+           d.document_state_id,
+           uf.uf,
+           d.document_city_id
+    from documents d
+             inner join document_scopes ds on d.document_scope_id = ds.document_scope_id
+             left join states uf on d.document_state_id = uf.state_id
+             left join cities c on c.state_id = d.document_state_id and c.city_id = d.document_city_id
+) docs on tlaa.NUMERO = docs.document_number AND date_add(date('1899-12-31'), interval (tlaa.`DATA` -1) day ) = docs.document_date
+inner join document_scopes scp on UPPER(TRIM(tlaa.AMBITO)) = scp.document_scope_description
+inner join document_status sts on upper(TRIM(tlaa.STATUS)) = sts.status_description
+left join states uf on UPPER(TRIM(tlaa.ESTADO)) = UPPER(TRIM(uf.uf))
+left join cities cty on UPPER(TRIM(tlaa.ESTADO)) = UPPER(TRIM(uf.uf)) and UPPER(TRIM(tlaa.MUNICIPIO)) = UPPER(TRIM(cty.city_name))
+inner join document_items di on docs.document_id = di.document_id ;
 
 
 
@@ -139,4 +171,8 @@ INSERT INTO units_contacts (UNIT_CONTACT_NAME, UNIT_CONTACT_EMAIL, UNIT_CONTACT_
 insert into users (user_name, user_email, user_password, user_profile_type, user_role, createdAt, updatedAt)
 values  ('cleiton',	'cleiton.marques@200.systems',	'$2a$10$7NHGMMpCf65GXu8sbY0/eOnqvWlS6Fco1tkQp9w4Plbx3sdG7wYQC',	'gestor',	'admin', now(), now()),
 		('Andrea Souza',	'andrea.souza@unity.com.br',	'$2a$10$QMISAmUOAMaLyZ.uxDj4pOfOTQp.aOEB56QtP52.rHTbInZRh91FO',	'gestor',	'admin', now(), now()),
-       ('Ana Lucia',	'analucia.lopes@unity.com.br',	'$2a$10$QMISAmUOAMaLyZ.uxDj4pOfOTQp.aOEB56QtP52.rHTbInZRh91FO',	'gestor',	'admin', now(), now());
+        ('Ana Lucia',	'analucia.lopes@unity.com.br',	'$2a$10$QMISAmUOAMaLyZ.uxDj4pOfOTQp.aOEB56QtP52.rHTbInZRh91FO',	'gestor',	'admin', now(), now()),
+        ('CATHERINE MAGALHÃES','CATHERINE.MAGALHAES@UNITY.COM.BR','$2a$10$AxtTziDUPoVneNt5Xc3LrOpkbvDGzxyEh5QESpqNeT4AnsZxvrbZS','gestor','admin', now(), now()),
+        ('RENATO FONTOLAN','RENATO.FONTOLAN@UNITY.COM.BR','$2a$10$7CX6divylzDkNbRdYoI/QunxgYv9E6aigsEz0/NkCHE0xTrZxuqBq','gestor','admin', now(), now()),
+        ('MÔNICA OLIVEIRA','MONICA.OLIVEIRA@UNITY.COM.BR','$2a$10$ryb5pBSbrY.Ldos7F/48XeBBjjux1RFLI35a062YeFfciWPD5nkC2','gestor','admin', now(), now());
+
