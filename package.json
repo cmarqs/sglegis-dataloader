@@ -1,0 +1,10 @@
+{
+  "dependencies": {
+    "assert": "^2.0.0",
+    "bluebird": "^3.7.2",
+    "csv-reader": "^1.0.8",
+    "dotenv": "^10.0.0",
+    "fs": "0.0.1-security",
+    "mysql2": "^2.2.5"
+  }
+}
