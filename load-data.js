@@ -11,18 +11,24 @@ exports.importData = () => {
     return new Promise(function(resolve, reject) {
         // do a thing, possibly async, then…
         try {
-            console.log('Saving states');
-            readAndSave('tmpStates', './states.csv', 'UTF-8', ';', ['cod_uf', 'sigla_uf', 'nome_uf']);
+            // console.log('Saving states');
+            // readAndSave('tmpStates', './states.csv', 'UTF-8', ';', ['cod_uf', 'sigla_uf', 'nome_uf']);
 
-            console.log('Saving cities');
-            readAndSave('tmpCities', './cities.csv', 'UTF-8', ';', ['idlocalidade', 'nome_localidade', 'cod_uf']);
+            // console.log('Saving cities');
+            // readAndSave('tmpCities', './cities.csv', 'UTF-8', ';', ['idlocalidade', 'nome_localidade', 'cod_uf']);
 
-            console.log('Saving documents and aspects');
-            readAndSave('tmpLeisArtigosAspecto',
-                '/Users/cleiton/Downloads/planilha_unificada.csv',
-                'UTF-8',
-                ';',
-                ['QA', 'SS', 'MA', 'ASPECTO', 'AMBITO', 'MUNICIPIO', 'ESTADO', 'FEDERAL', 'ANEXO', 'DOCUMENTO', 'NUMERO', 'DATA', 'OBSERVACAO', 'STATUS', 'EMENTA', 'ITEM', 'DESCRICAO']
+            // console.log('Saving documents and aspects');
+            // readAndSave('tmpLeisArtigosAspecto',
+            //     '/Users/cleiton/Downloads/unificada.csv',
+            //     'UTF-8',
+            //     ';',
+            //     ['QA', 'SS', 'MA', 'ASPECTO', 'AMBITO', 'MUNICIPIO', 'ESTADO', 'FEDERAL', 'ANEXO', 'DOCUMENTO', 'NUMERO', 'DATA', 'OBSERVACAO', 'STATUS', 'EMENTA', 'ITEM', 'DESCRICAO']
+            // );
+            // readAndSave('tmpAuditoria', '/Users/cleiton/Downloads/auditoria.csv', 'UTF-8', ';',
+            //     ['ASPECTO', 'AMBITO', 'SG', 'DOCUMENTO', 'NUMERO', 'DATA', 'EMENTA', 'ITEM', 'DESCRICAO', 'ORDEMPRATICA', 'ATENDE', 'EVIDENCIA', 'CONTROLE', 'RESPONSAVEL']
+            // );
+            readAndSave('tmpAttachments', '/Users/cleiton/Downloads/attachments.csv', 'UTF-8', ';',
+                ['UF','CIDADE','ANEXO','DOCUMENTO','NUMERO','DATA','EMENTA','STATUS']
             );
 
             resolve(Date.now());

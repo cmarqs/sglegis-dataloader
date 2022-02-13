@@ -1,5 +1,4 @@
 use sglegis_hmlg_database;
-use sgLegis;
 /*
 SET FOREIGN_KEY_CHECKS = 0;
     truncate table ceps;
@@ -8,33 +7,37 @@ SET FOREIGN_KEY_CHECKS = 1;
 */
 select count(1) from tmpCities; -- total correto 6068
 select count(1) from tmpStates;
-select count(1) from tmpLeisArtigosAspecto; -- total correto 8409
+select count(1) from tmpLeisArtigosAspecto; -- total correto 9748
 
-insert into document_status (status_description, createdAt, updatedAt) values
-('EM VIGOR',now(), now()),
-('REVOGADA',now(), now()),
-('SUSPENSA',now(), now()),
-('FUTURO', now(), now());
 
-insert into document_scopes (document_scope_description, createdAt, updatedAt) values
-('GLOBAL',now(), now()),
-('FEDERAL',now(), now()),
-('ESTADUAL',now(), now()),
-('MUNICIPAL',now(), now());
+insert into document_status (status_description, createdAt) values
+('EM VIGOR',now()),
+('REVOGADA',now()),
+('SUSPENSA',now()),
+('FUTURO', now())
+on duplicate key update updatedAt = now()
+;
+
+insert into document_scopes (document_scope_description, createdAt) values
+('GLOBAL',now()),
+('FEDERAL',now()),
+('ESTADUAL',now()),
+('MUNICIPAL',now())
+on duplicate key update updatedAt = now();
 
 insert into states (state_id, state_name, uf, createdAt)
-select cod_uf, nome_uf, sigla_uf, now() from tmpStates;
+select cod_uf, nome_uf, sigla_uf, now() from tmpStates
+on duplicate key update updatedAt = now();
 
 
 insert into cities (city_id, state_id, city_name, uf, createdAt)
-select tc.idlocalidade, st.cod_uf, tc.nome_localidade, st.sigla_uf, now() from tmpCities tc inner join tmpStates st on tc.cod_uf = st.cod_uf ;
+select tc.idlocalidade, st.cod_uf, tc.nome_localidade, st.sigla_uf, now() from tmpCities tc inner join tmpStates st on tc.cod_uf = st.cod_uf
+on duplicate key update updatedAt = now();
 
 
-insert into areas (area_name, createdAt, updatedAt) VALUES ('QUALIDADE', now(), now());
-insert into areas (area_name, createdAt, updatedAt) VALUES ('SAÚDE E SEGURANÇA', now(), now());
-insert into areas (area_name, createdAt, updatedAt) VALUES ('MEIO AMBIENTE', now(), now());
-
-
+insert into areas (area_name, createdAt) VALUES ('QUALIDADE', now()) on duplicate key update updatedAt = now();
+insert into areas (area_name, createdAt) VALUES ('SAÚDE E SEGURANÇA', now()) on duplicate key update updatedAt = now();
+insert into areas (area_name, createdAt) VALUES ('MEIO AMBIENTE', now()) on duplicate key update updatedAt = now();
 
 UPDATE tmpLeisArtigosAspecto set AMBITO = 'FEDERAL' where FEDERAL = 'Brasil';
 UPDATE tmpLeisArtigosAspecto set AMBITO = 'ESTADUAL' where ESTADO IS NOT NULL and MUNICIPIO IS NULL;
@@ -42,47 +45,46 @@ UPDATE tmpLeisArtigosAspecto set AMBITO = 'MUNICIPAL' where MUNICIPIO IS NOT NUL
 
 UPDATE tmpLeisArtigosAspecto SET ASPECTO = REPLACE(REPLACE(ASPECTO, '\r', ''), '\n', '');
 
-insert into areas_aspects (area_aspect_name, area_id, createdAt, updatedAt)
+
+insert into areas_aspects (area_aspect_name, area_id, createdAt)
 select
 	DISTINCT
 	(UPPER(TRIM(tmp.ASPECTO))) as ASPECTO,
 	a.area_id,
-	NOW() as dtCreated,
-	NOW() as dtUpdated
+	NOW() as dtCreated
 from tmpLeisArtigosAspecto tmp
-inner join areas a on upper(tmp.QA)  = 'X' and 'QUALIDADE' = a.area_name ;
+inner join areas a on upper(tmp.QA)  = 'X' and 'QUALIDADE' = a.area_name
+on duplicate  key update updatedAt = now();
 
-insert into areas_aspects (area_aspect_name, area_id, createdAt, updatedAt)
+insert into areas_aspects (area_aspect_name, area_id, createdAt)
 select
 	DISTINCT
 	(UPPER(TRIM(tmp.ASPECTO))) as ASPECTO,
 	a.area_id,
-	NOW() as dtCreated,
-	NOW() as dtUpdated
+	NOW() as dtCreated
 from tmpLeisArtigosAspecto tmp
-inner join areas a on upper(tmp.SS)  = 'X' and 'SAÚDE E SEGURANÇA' = a.area_name ;
+inner join areas a on upper(tmp.SS)  = 'X' and 'SAÚDE E SEGURANÇA' = a.area_name
+on duplicate  key update updatedAt = now();
 
-insert into areas_aspects (area_aspect_name, area_id, createdAt, updatedAt)
+insert into areas_aspects (area_aspect_name, area_id, createdAt)
 select
 	DISTINCT
 	(UPPER(left(TRIM(tmp.ASPECTO), 100))) as ASPECTO,
 	a.area_id,
-	NOW() as dtCreated,
-	NOW() as dtUpdated
+	NOW() as dtCreated
 from tmpLeisArtigosAspecto tmp
-inner join areas a on upper(tmp.MA)  = 'X' and 'MEIO AMBIENTE' = a.area_name and tmp.ASPECTO is not null;
+inner join areas a on upper(tmp.MA)  = 'X' and 'MEIO AMBIENTE' = a.area_name and tmp.ASPECTO is not null
+on duplicate  key update updatedAt = now();
 
-
-insert into documents (document_scope_id,document_type,document_number,document_date,document_status_id,document_summary,document_state_id,document_city_id,createdAt,updatedAt)
-select distinct tmp.document_scope_id, tmp.document_type, tmp.document_number, tmp.document_date, tmp.document_status_id, tmp.document_summary, tmp.document_state_id, tmp.document_city_id, tmp.createdAt, tmp.updatedAt
---  document_scope_id,document_type,document_number,document_date,document_status_id,document_summary,document_state_id,document_city_id, COUNT(1)
+-- get duplicates -- fields: ['document_number', 'document_scope_id', 'document_date', 'document_state_id', 'document_city_id']
+select distinct document_number, scope_id, document_date, document_state_id, document_city_id, document_summary, count(1) as total
 from (
 	select distinct
-		scp.document_scope_id,
+		scp.document_scope_id AS scope_id,
 		DOCUMENTO AS document_type,
 		NUMERO as document_number,
 		date_add(date('1899-12-31'), interval (tmp.`DATA` -1) day ) as document_date,
-		1 as document_status_id, -- EM VIGOR
+		sts.status_id as document_status_id,
 		coalesce(tmp.ementa, 'sem ementa') as document_summary,
 		uf.state_id as document_state_id,
 		cty.city_id as document_city_id,
@@ -96,14 +98,38 @@ from (
 	left join states uf on UPPER(TRIM(tmp.ESTADO)) = UPPER(TRIM(uf.uf))
 	left join cities cty on UPPER(TRIM(tmp.ESTADO)) = UPPER(TRIM(uf.uf)) and UPPER(TRIM(tmp.MUNICIPIO)) = UPPER(TRIM(cty.city_name))
 ) tmp
--- group by document_scope_id,document_type,document_number,document_date,document_status_id,document_summary,document_state_id,document_city_id
--- HAVING count(1) > 1
-;
+group by document_number, scope_id, document_date, document_state_id, document_city_id, document_summary
+HAVING count(1) > 1;
+
+insert into documents (document_scope_id,document_type,document_number,document_date,document_status_id,document_summary,document_state_id,document_city_id,createdAt,updatedAt)
+select distinct tmp.document_scope_id, tmp.document_type, tmp.document_number, tmp.document_date, tmp.document_status_id, tmp.document_summary, tmp.document_state_id, tmp.document_city_id, tmp.createdAt, tmp.updatedAt
+from (
+	select distinct
+		scp.document_scope_id,
+		DOCUMENTO AS document_type,
+		NUMERO as document_number,
+		date_add(date('1899-12-31'), interval (tmp.`DATA` -1) day ) as document_date,
+		sts.status_id as document_status_id,
+		coalesce(tmp.ementa, 'sem ementa') as document_summary,
+		uf.state_id as document_state_id,
+		cty.city_id as document_city_id,
+		now() as createdAt,
+		now() as updatedAt
+	from tmpLeisArtigosAspecto tmp
+	inner join document_scopes scp on UPPER(TRIM(tmp.AMBITO)) = scp.document_scope_description
+	inner join document_status sts on upper(TRIM(tmp.STATUS)) = sts.status_description
+	inner join areas a on ((upper(tmp.MA)  = 'X' and 'MEIO AMBIENTE' = a.area_name) or (upper(tmp.QA)  = 'X' and 'QUALIDADE' = a.area_name) or (upper(tmp.SS)  = 'X' and 'SAÚDE E SEGURANÇA' = a.area_name))
+	inner join areas_aspects aa on a.area_id = aa.area_id and aa.area_aspect_name = (UPPER(left(TRIM(tmp.ASPECTO), 100)))
+	left join states uf on UPPER(TRIM(tmp.ESTADO)) = UPPER(TRIM(uf.uf))
+	left join cities cty on UPPER(TRIM(tmp.ESTADO)) = UPPER(TRIM(uf.uf)) and UPPER(TRIM(tmp.MUNICIPIO)) = UPPER(TRIM(cty.city_name))
+) tmp
+ON DUPLICATE KEY UPDATE updatedAt = now();
+
 
 insert into document_items (document_item_number, document_item_order, document_item_status_id, document_item_description, document_item_observation, document_id, createdAt, updatedAt)
 select distinct
        x.ITEM as document_item_number,
-       1 as document_item_order,
+       99 as document_item_order,
        ds.status_id as document_item_status,
        x.DESCRICAO as document_item_description,
        x.OBSERVACAO as document_item_observation,
@@ -114,7 +140,7 @@ from tmpLeisArtigosAspecto x
     inner join document_status ds on x.STATUS = ds.status_description
 inner join (
     select d.document_id,
-           d.document_summary,
+           coalesce(d.document_summary, 'sem ementa') as document_summary,
            d.document_number,
            d.document_scope_id,
            ds.document_scope_description,
@@ -128,8 +154,8 @@ inner join (
              left join cities c on c.state_id = d.document_state_id and c.city_id = d.document_city_id
 ) docs on x.NUMERO = docs.document_number AND
           date_add(date('1899-12-31'), interval (x.`DATA` -1) day ) = docs.document_date
+         AND coalesce(docs.document_summary, 'sem ementa') = x.EMENTA
 where x.ITEM is not null;
-
 
 
 insert into items_areas_aspects (area_id , area_aspect_id, document_item_id, createdAt, updatedAt)
@@ -152,14 +178,13 @@ inner join (
              inner join document_scopes ds on d.document_scope_id = ds.document_scope_id
              left join states uf on d.document_state_id = uf.state_id
              left join cities c on c.state_id = d.document_state_id and c.city_id = d.document_city_id
-) docs on tlaa.NUMERO = docs.document_number AND date_add(date('1899-12-31'), interval (tlaa.`DATA` -1) day ) = docs.document_date
+) docs on tlaa.NUMERO = docs.document_number /* AND date_add(date('1899-12-31'), interval (tlaa.`DATA` -1) day ) = docs.document_date */
 inner join document_scopes scp on UPPER(TRIM(tlaa.AMBITO)) = scp.document_scope_description
 inner join document_status sts on upper(TRIM(tlaa.STATUS)) = sts.status_description
 left join states uf on UPPER(TRIM(tlaa.ESTADO)) = UPPER(TRIM(uf.uf))
 left join cities cty on UPPER(TRIM(tlaa.ESTADO)) = UPPER(TRIM(uf.uf)) and UPPER(TRIM(tlaa.MUNICIPIO)) = UPPER(TRIM(cty.city_name))
-inner join document_items di on docs.document_id = di.document_id ;
-
-
+inner join document_items di on docs.document_id = di.document_id and tlaa.DESCRICAO = di.document_item_description
+ON DUPLICATE KEY UPDATE updatedAt = now();
 
 /*--------- INITIAL DATA ----------- */
 
@@ -175,4 +200,3 @@ values  ('cleiton',	'cleiton.marques@200.systems',	'$2a$10$7NHGMMpCf65GXu8sbY0/e
         ('CATHERINE MAGALHÃES','CATHERINE.MAGALHAES@UNITY.COM.BR','$2a$10$AxtTziDUPoVneNt5Xc3LrOpkbvDGzxyEh5QESpqNeT4AnsZxvrbZS','gestor','admin', now(), now()),
         ('RENATO FONTOLAN','RENATO.FONTOLAN@UNITY.COM.BR','$2a$10$7CX6divylzDkNbRdYoI/QunxgYv9E6aigsEz0/NkCHE0xTrZxuqBq','gestor','admin', now(), now()),
         ('MÔNICA OLIVEIRA','MONICA.OLIVEIRA@UNITY.COM.BR','$2a$10$ryb5pBSbrY.Ldos7F/48XeBBjjux1RFLI35a062YeFfciWPD5nkC2','gestor','admin', now(), now());
-
